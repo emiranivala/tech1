@@ -26,16 +26,17 @@ async def downstatus(client: Client, statusfile, message):
     while True:
         if os.path.exists(statusfile):
             break
-
         await asyncio.sleep(3)
       
     while os.path.exists(statusfile):
         with open(statusfile, "r") as downread:
             txt = downread.read()
+        # Use a simple dot if the status is empty
+        status_text = f"Downloaded : {txt}" if txt.strip() else "."
         try:
-            await client.edit_message_text(message.chat.id, message.id, f"Downloaded : {txt}")
+            await client.edit_message_text(message.chat.id, message.id, status_text)
             await asyncio.sleep(10)
-        except:
+        except Exception:
             await asyncio.sleep(5)
 
 
@@ -44,15 +45,16 @@ async def upstatus(client: Client, statusfile, message):
     while True:
         if os.path.exists(statusfile):
             break
-
         await asyncio.sleep(3)      
     while os.path.exists(statusfile):
         with open(statusfile, "r") as upread:
             txt = upread.read()
+        # Use a simple dot if the status is empty
+        status_text = f"Uploaded : {txt}" if txt.strip() else "."
         try:
-            await client.edit_message_text(message.chat.id, message.id, f"Uploaded : {txt}")
+            await client.edit_message_text(message.chat.id, message.id, status_text)
             await asyncio.sleep(10)
-        except:
+        except Exception:
             await asyncio.sleep(5)
 
 
@@ -66,13 +68,18 @@ def progress(current, total, message, type):
 @Client.on_message(filters.command(["start"]))
 async def send_start(client: Client, message: Message):
     buttons = [[
-        InlineKeyboardButton("❣️ Developer", url = "https://t.me/She_who_remain")
-    ],[
+        InlineKeyboardButton("❣️ Developer", url="https://t.me/She_who_remain")
+    ], [
         InlineKeyboardButton('🔍 sᴜᴘᴘᴏʀᴛ ɢʀᴏᴜᴘ', url='https://t.me/+3bMBj190KOc3YzNk'),
         InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇ ᴄʜᴀɴɴᴇʟ', url='https://t.me/+3bMBj190KOc3YzNk')
-	]]
+    ]]
     reply_markup = InlineKeyboardMarkup(buttons)
-    await client.send_message(message.chat.id, f"<b>👋 Hi {message.from_user.mention}, I am Save Restricted Content Bot, I can send you restricted content by its post link.\n\nFor downloading restricted content /login first.\n\nKnow how to use bot by - /help</b>", reply_markup=reply_markup, reply_to_message_id=message.id)
+    await client.send_message(
+        message.chat.id, 
+        f"<b>👋 Hi {message.from_user.mention}, I am Save Restricted Content Bot, I can send you restricted content by its post link.\n\nFor downloading restricted content /login first.\n\nKnow how to use bot by - /help</b>", 
+        reply_markup=reply_markup, 
+        reply_to_message_id=message.id
+    )
     return
 
 
@@ -81,17 +88,18 @@ async def send_start(client: Client, message: Message):
 async def send_help(client: Client, message: Message):
     await client.send_message(message.chat.id, f"{HELP_TXT}")
 
+
 @Client.on_message(filters.text & filters.private)
 async def save(client: Client, message: Message):
     if "https://t.me/" in message.text:
         datas = message.text.split("/")
-        temp = datas[-1].replace("?single","").split("-")
+        temp = datas[-1].replace("?single", "").split("-")
         fromID = int(temp[0].strip())
         try:
             toID = int(temp[1].strip())
         except:
             toID = fromID
-        for msgid in range(fromID, toID+1):
+        for msgid in range(fromID, toID + 1):
             # private
             if "https://t.me/c/" in message.text:
                 user_data = database.find_one({'chat_id': message.chat.id})
@@ -117,10 +125,9 @@ async def save(client: Client, message: Message):
                 except Exception as e:
                     await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
             
-	        # public
+            # public
             else:
                 username = datas[3]
-
                 try:
                     msg = await client.get_messages(username, msgid)
                 except UsernameNotOccupied: 
@@ -140,7 +147,6 @@ async def save(client: Client, message: Message):
                         
                     except Exception as e:
                         await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-
             # wait time
             await asyncio.sleep(3)
 
@@ -150,97 +156,100 @@ async def handle_private(client: Client, acc, message: Message, chatid: int, msg
     msg: Message = await acc.get_messages(chatid, msgid)
     msg_type = get_message_type(msg)
     chat = message.chat.id
-    if "Text" == msg_type:
+    if msg_type == "Text":
         try:
             await client.send_message(chat, msg.text, entities=msg.entities, reply_to_message_id=message.id)
         except Exception as e:
             await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-            return
+        return
 
-    smsg = await client.send_message(message.chat.id, 'Downloading', reply_to_message_id=message.id)
-    dosta = asyncio.create_task(downstatus(client, f'{message.id}downstatus.txt', smsg))
+    # Send a simple dot message (.) to show progress
+    smsg = await client.send_message(message.chat.id, '.', reply_to_message_id=message.id)
+    download_status_file = f'{message.id}downstatus.txt'
+    upload_status_file = f'{message.id}upstatus.txt'
+    down_task = asyncio.create_task(downstatus(client, download_status_file, smsg))
+
+    file = None
     try:
-        file = await acc.download_media(msg, progress=progress, progress_args=[message,"down"])
-        os.remove(f'{message.id}downstatus.txt')
-        
+        file = await acc.download_media(msg, progress=progress, progress_args=[message, "down"])
     except Exception as e:
-        await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)  
-    
-    upsta = asyncio.create_task(upstatus(client, f'{message.id}upstatus.txt', smsg))
+        await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+    finally:
+        if os.path.exists(download_status_file):
+            os.remove(download_status_file)
 
-    if msg.caption:
-        caption = msg.caption
-    else:
-        caption = None
-            
-    if "Document" == msg_type:
-        try:
-            ph_path = await acc.download_media(msg.document.thumbs[0].file_id)
-        except:
-            ph_path = None
-        
-        try:
-            await client.send_document(chat, file, thumb=ph_path, caption=caption, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])
-        except Exception as e:
-            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-        if ph_path != None: os.remove(ph_path)
-        
+    up_task = asyncio.create_task(upstatus(client, upload_status_file, smsg))
 
-    elif "Video" == msg_type:
-        try:
-            ph_path = await acc.download_media(msg.video.thumbs[0].file_id)
-        except:
-            ph_path = None
-        
-        try:
-            await client.send_video(chat, file, duration=msg.video.duration, width=msg.video.width, height=msg.video.height, thumb=ph_path, caption=caption, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])
-        except Exception as e:
-            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-        if ph_path != None: os.remove(ph_path)
+    caption = msg.caption if msg.caption else None
 
-    elif "Animation" == msg_type:
-        try:
-            await client.send_animation(chat, file, reply_to_message_id=message.id)
-        except Exception as e:
-            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-        
+    try:
+        if msg_type == "Document":
+            try:
+                ph_path = await acc.download_media(msg.document.thumbs[0].file_id)
+            except:
+                ph_path = None
+            try:
+                await client.send_document(chat, file, thumb=ph_path, caption=caption, reply_to_message_id=message.id, progress=progress, progress_args=[message, "up"])
+            except Exception as e:
+                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+            if ph_path and os.path.exists(ph_path):
+                os.remove(ph_path)
 
-    elif "Sticker" == msg_type:
-        try:
-            await client.send_sticker(chat, file, reply_to_message_id=message.id)
-        except Exception as e:
-            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-        
+        elif msg_type == "Video":
+            try:
+                ph_path = await acc.download_media(msg.video.thumbs[0].file_id)
+            except:
+                ph_path = None
+            try:
+                await client.send_video(chat, file, duration=msg.video.duration, width=msg.video.width, height=msg.video.height, thumb=ph_path, caption=caption, reply_to_message_id=message.id, progress=progress, progress_args=[message, "up"])
+            except Exception as e:
+                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+            if ph_path and os.path.exists(ph_path):
+                os.remove(ph_path)
 
-    elif "Voice" == msg_type:
-        try:
-            await client.send_voice(chat, file, caption=caption, caption_entities=msg.caption_entities, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])
-        except Exception as e:
-            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+        elif msg_type == "Animation":
+            try:
+                await client.send_animation(chat, file, reply_to_message_id=message.id)
+            except Exception as e:
+                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
 
-    elif "Audio" == msg_type:
-        try:
-            ph_path = await acc.download_media(msg.audio.thumbs[0].file_id)
-        except:
-            ph_path = None
+        elif msg_type == "Sticker":
+            try:
+                await client.send_sticker(chat, file, reply_to_message_id=message.id)
+            except Exception as e:
+                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
 
-        try:
-            await client.send_audio(chat, file, thumb=ph_path, caption=caption, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])   
-        except Exception as e:
-            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-        
-        if ph_path != None: os.remove(ph_path)
+        elif msg_type == "Voice":
+            try:
+                await client.send_voice(chat, file, caption=caption, caption_entities=msg.caption_entities, reply_to_message_id=message.id, progress=progress, progress_args=[message, "up"])
+            except Exception as e:
+                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
 
-    elif "Photo" == msg_type:
-        try:
-            await client.send_photo(chat, file, caption=caption, reply_to_message_id=message.id)
-        except Exception as e:
-            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-    
-    if os.path.exists(f'{message.id}upstatus.txt'): 
-        os.remove(f'{message.id}upstatus.txt')
-        os.remove(file)
-    await client.delete_messages(message.chat.id,[smsg.id])
+        elif msg_type == "Audio":
+            try:
+                ph_path = await acc.download_media(msg.audio.thumbs[0].file_id)
+            except:
+                ph_path = None
+            try:
+                await client.send_audio(chat, file, thumb=ph_path, caption=caption, reply_to_message_id=message.id, progress=progress, progress_args=[message, "up"])   
+            except Exception as e:
+                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+            if ph_path and os.path.exists(ph_path):
+                os.remove(ph_path)
+
+        elif msg_type == "Photo":
+            try:
+                await client.send_photo(chat, file, caption=caption, reply_to_message_id=message.id)
+            except Exception as e:
+                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+    finally:
+        # Auto-delete the downloaded file and cleanup status files from disk.
+        if file and os.path.exists(file):
+            os.remove(file)
+        if os.path.exists(upload_status_file):
+            os.remove(upload_status_file)
+        # Delete the dot message after successfully uploaded.
+        await client.delete_messages(message.chat.id, [smsg.id])
 
 
 # get the type of message
@@ -292,4 +301,3 @@ def get_message_type(msg: pyrogram.types.messages_and_media.message.Message):
         return "Text"
     except:
         pass
-        
