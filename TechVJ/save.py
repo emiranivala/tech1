@@ -221,7 +221,8 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
                 if msg.media == MessageMediaType.WEB_PAGE:
                     target_chat_id = user_chat_ids.get(chatx, chatx)
                     edit = await app.edit_message_text(sender, edit_id, "Cloning...")
-                    devgaganin = await app.send_message(target_chat_id, msg.text.markdown)
+                    # Use plain text instead of markdown to avoid parse mode issues.
+                    devgaganin = await app.send_message(target_chat_id, msg.text)
                     if msg.pinned_message:
                         try:
                             await devgaganin.pin(both_sides=True)
@@ -234,7 +235,8 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
                 if msg.text:
                     target_chat_id = user_chat_ids.get(chatx, chatx)
                     edit = await app.edit_message_text(sender, edit_id, "Cloning...")
-                    devgaganin = await app.send_message(target_chat_id, msg.text.markdown)
+                    # Use plain text here as well.
+                    devgaganin = await app.send_message(target_chat_id, msg.text)
                     if msg.pinned_message:
                         try:
                             await devgaganin.pin(both_sides=True)
