@@ -29,7 +29,6 @@ from SpyLib import fast_upload
 
 # Download progress status updater
 async def downstatus(client: Client, statusfile, message):
-    # Wait until the status file appears
     while not os.path.exists(statusfile):
         await asyncio.sleep(3)
     while os.path.exists(statusfile):
@@ -65,27 +64,20 @@ def progress(current, total, message, type):
 # ===================== New function to handle public restricted messages =====================
 async def handle_public_restricted(client: Client, sender, chat_username, message_id):
     """
-    For public groups (chat_id as string), manually download the message media (with progress)
-    and then reupload it.
+    For public groups (chat_id as string), manually download the message media with progress updates,
+    then reupload it.
     """
-    # Get the message
     try:
         msg = await client.get_messages(chat_username, message_id)
     except Exception as e:
         await client.send_message(sender, f"Error retrieving message: {e}")
         return
 
-    # Create a temporary status message for progress updates
     temp_msg = await client.send_message(sender, "Processing restricted content...")
-    
-    # Define status filenames based on the temporary message id
     down_status_file = f"{temp_msg.id}_downstatus.txt"
     up_status_file = f"{temp_msg.id}_upstatus.txt"
-    
-    # Start a background task to update download progress
+
     down_task = asyncio.create_task(downstatus(client, down_status_file, temp_msg))
-    
-    # Download the media manually with our progress callback
     try:
         file = await client.download_media(
             msg,
@@ -99,12 +91,9 @@ async def handle_public_restricted(client: Client, sender, chat_username, messag
         if os.path.exists(down_status_file):
             os.remove(down_status_file)
         down_task.cancel()
-    
-    # Start a background task to update upload progress
+
     up_task = asyncio.create_task(upstatus(client, up_status_file, temp_msg))
-    
     caption = msg.caption if msg.caption else ""
-    # Determine media type and upload accordingly
     try:
         if msg.media == MessageMediaType.VIDEO:
             result = await client.send_video(sender, file, caption=caption, progress=progress, progress_args=[temp_msg, "up"])
@@ -113,7 +102,6 @@ async def handle_public_restricted(client: Client, sender, chat_username, messag
         elif msg.media == MessageMediaType.PHOTO:
             result = await client.send_photo(sender, file, caption=caption)
         else:
-            # Fallback: send as document
             result = await client.send_document(sender, file, caption=caption, progress=progress, progress_args=[temp_msg, "up"])
     except Exception as e:
         await client.edit_message_text(sender, temp_msg.id, f"Upload error: {e}")
@@ -122,9 +110,7 @@ async def handle_public_restricted(client: Client, sender, chat_username, messag
         if os.path.exists(up_status_file):
             os.remove(up_status_file)
         up_task.cancel()
-        # Remove the temporary progress message
         await client.delete_messages(sender, [temp_msg.id])
-        # Optionally, remove the downloaded file
         if file and os.path.exists(file):
             os.remove(file)
     return result
@@ -273,7 +259,8 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
             file = await userbot.download_media(
                 msg,
                 progress=progress_bar,
-                progress_args=("╭─────────────────────╮\n│      **__Downloading by Crushe__...**\n├─────────────────────", edit, time.time()))
+                progress_args=("╭─────────────────────╮\n│      **__Downloading by Crushe__...**\n├─────────────────────", edit, time.time())
+            )
             # --- Updated File-Renaming Block ---
             custom_rename_tag = get_user_rename_preference(chatx)
             is_video = False
@@ -630,7 +617,6 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
         edit = await app.edit_message_text(sender, edit_id, "Cloning by Crushe...")
         try:
             parts = msg_link.split("/")
-            # For non t.me/c links, if URL has more than 5 parts, use element at index 3 as the group name.
             if len(parts) > 5:
                 chat = parts[3]
             else:
@@ -644,10 +630,8 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
 async def copy_message_with_chat_id(client, sender, chat_id, message_id):
     target_chat_id = user_chat_ids.get(sender, sender)
     try:
-        # If public group (chat_id as string) and link looks like restricted content, use manual download/upload
         if isinstance(chat_id, str):
             return await handle_public_restricted(client, sender, chat_id, message_id)
-        # Otherwise, use the original logic for private groups:
         msg = await client.get_messages(chat_id, message_id)
         custom_caption = get_user_caption_preference(sender)
         original_caption = msg.caption if msg.caption else (msg.text if msg.text else '')
